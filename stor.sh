@@ -47,7 +47,6 @@ allocate_file () {
 	fi
 
 	# create a new file descriptor (FD3) to catch command outputs without bloating console on success
-	# the immediate rm call is deferred until the file descriptor is closed, which happens when the script exits or crashes
 	local FD3=$(mktemp);
 	if [[ "$?" -ne 0 ]];then
 		echo "$FD3";
@@ -57,16 +56,17 @@ allocate_file () {
 	if [[ "$?" -ne 0 ]];then
 		echo >&2 "Failed to create temporary file handle"; return 1;	
 	fi
-	rm "$FD3";
+	
 
 	# allocate required space
 	echo "Allocating ${STOR_UNIT_COUNT}${STOR_UNIT} of disk space";
 	dd if=/dev/zero bs=1"${STOR_UNIT}" count="${STOR_UNIT_COUNT}" 2>/dev/null | pv -s "${STOR_UNIT_COUNT}${STOR_UNIT}" | dd of="${STOR_FILE}" 2>&3;
 	if [[ "$?" -ne 0 ]];then
 		cat "$FD3";
+		rm "$FD3";
 		echo >&2 "Failed to allocate disk space. Aborting."; return 1;
 	fi
-
+	rm "$FD3";
 	return 0;
 }
 
@@ -79,28 +79,11 @@ allocate_file () {
 luks_zero_device () {
 	local STOR_UNIT=${1: -1};
 	local STOR_UNIT_COUNT=${1: : -1};
-	local STOR_FILE=$2;
+	local STOR_DEV_ID=$2;
 
-	# create a new file descriptor (FD4) to catch command outputs without bloating console on success
-	# the immediate rm call is deferred until the file descriptor is closed, which happens when the script exits or crashes
-	local FD4=$(mktemp);
-	if [[ "$?" -ne 0 ]];then
-		echo "$FD4";
-		echo >&2 "Failed to create temporary file"; return 1;
-	fi
-	exec 4>"$FD4";
-	if [[ "$?" -ne 0 ]];then
-		echo >&2 "Failed to create temporary file handle"; return 1;	
-	fi
-	rm "$FD4";
-	
 	# overwrite device
 	echo "Overwriting luks device with zero";
-	dd if=/dev/zero bs=1"${STOR_UNIT}" count="${STOR_UNIT_COUNT}" 2>/dev/null | pv -s "${STOR_UNIT_COUNT}${STOR_UNIT}" | dd of="${STOR_FILE}" 2>&4;
-	if [[ "$?" -ne 0 ]];then
-		cat "$FD4";
-		echo >&2 "Failed to overwrite luks device. Aborting."; return 1;
-	fi
+	dd if=/dev/zero bs=1"${STOR_UNIT}" count="${STOR_UNIT_COUNT}" 2>/dev/null | pv -s "${STOR_UNIT_COUNT}${STOR_UNIT}" | dd of="/dev/mapper/${STOR_DEV_ID}" 2>/dev/null;
 	return 0;
 }
 
@@ -294,6 +277,8 @@ luks_open () {
 luks_close () {
 	local STOR_DEV_ID=$1;
 	echo "Syncing filesystem";
+	# automounting is resilient sometimes
+	local IGNORE=$(umount -A -q "/dev/mapper/${STOR_DEV_ID}");
 	sync;
 	local OUTPUT=$(cryptsetup -q luksClose "$STOR_DEV_ID");
 	if [[ "$?" -ne 0 ]];then
@@ -459,11 +444,11 @@ if [[ "$#" -gt 3 && "$#" -lt 6 && "$1" == "create" ]];then
 		STOR_DEV_ID=$(stor_rand_string);
 		echo "Opening LUKS device";
 		luks_open "$STOR_FILE" "$STOR_DEV_ID" || { rm "$STOR_FILE"; exit 1; }
+		luks_zero_device "$STOR_SIZE" "$STOR_DEV_ID" || { rm "$STOR_FILE"; exit 1; }
 		create_fs "/dev/mapper/${STOR_DEV_ID}" || { rm "$STOR_FILE"; exit 1; }
 		if [[ -n "$STOR_NAME" ]];then
 			stor_rename "/dev/mapper/${STOR_DEV_ID}" "$STOR_NAME" || { rm "$STOR_FILE"; exit 1; }
 		fi
-		luks_zero_device "$STOR_SIZE" "$STOR_DEV_ID" || { rm "$STOR_FILE"; exit 1; }
 		luks_close "$STOR_DEV_ID" || { rm "$STOR_FILE"; exit 1; }
 		echo "Created encrypted vault storage at $STOR_FILE";
 		exit 0;
