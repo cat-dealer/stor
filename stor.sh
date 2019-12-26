@@ -100,7 +100,7 @@ create_fs () {
 stor_rename () {
 	STOR_FILE=$1;
 	STOR_NAME=$2;
-	if [[ "$STOR_NAME" == *""* ]];then
+	if [[ "$STOR_NAME" == *"ext4 filesystem data"* ]];then
 		echo "Stor name cannot contain string 'ext4 filesystem data'"; return 1;
 	fi
 	echo "Assigning name '$STOR_NAME' to storage";
@@ -133,6 +133,11 @@ stor_is_plain () {
 }
 
 
+#######################################################################
+##                                                                   ##
+## Mounts storage at path                                            ##
+##                                                                   ##
+#######################################################################
 stor_mount () {
 	STOR_FILE=$1;
 	STOR_MOUNT_PATH=$2;
@@ -147,6 +152,12 @@ stor_mount () {
 	fi
 }
 
+
+#######################################################################
+##                                                                   ##
+## Creates random directory in /media and mounts storage there       ##
+##                                                                   ##
+#######################################################################
 stor_automount () {
 	STOR_FILE=$1;
 	STOR_MOUNT_PATH=$(mktemp -d /media/STOR_AUTOMOUNT_XXXXXXXXXXXXXXXXXXXXXXXX);
