@@ -1,14 +1,5 @@
 #!/bin/bash
 
-
-# NOTES:
-# sizes < 2MB may fail on some systems, suggesting to use 16MB or bigger
-
-# QUESTIONS:
-# what happens if disk doesnt have enough storage space?
-# how do we handle help output? want "help/-h/--help" AND "stor [help/-h/--help] category"
-
-
 command -v cryptsetup >/dev/null 2>&1 || { echo >&2 "Could not find 'cryptsetup'. Aborting."; exit 1; }
 command -v mkfs.ext4 >/dev/null 2>&1 || { echo >&2 "Could not find 'mkfs.ext4'. Aborting."; exit 1; }
 command -v e2label >/dev/null 2>&1 || { echo >&2 "Could not find 'e2label'. Aborting."; exit 1; }
@@ -155,7 +146,7 @@ stor_mount () {
 
 #######################################################################
 ##                                                                   ##
-## Creates random directory in /media and mounts storage there       ##
+## Creates random directory in /media and mounts storage in it       ##
 ##                                                                   ##
 #######################################################################
 stor_automount () {
@@ -245,3 +236,54 @@ if [[ "$#" -eq 1 && "$1" == "clean" ]];then
 	OUTPUT=$(rm -r /media/STOR_AUTOMOUNT_* 2>&1);
 	echo "Cleanup complete";
 fi
+
+# stor help/-h/--help
+if [[ "$1" == "help" || "$1" == "-h" || "$1" == "--help" ]];then
+
+	if [[ "$#" -eq 1 ]];then
+	echo "Usage: $0 command options...
+For more detailed information, run '$0 help <command>'
+
+$0 create <size> <type> <file> [name] - Create a new storage file
+$0 rename <file> <name>               - Rename storage
+$0 mount <file> [path]                - Mount storage as filesystem
+$0 clean                              - Clean script leftover dirs
+";
+	elif [[ "$#" -eq 2 ]];then
+		if [[ "$2" == "create" ]];then
+echo "Usage: $0 create <size> <type> <file> [name]
+Creates a storage file at <file>. Will fail if it already exists.
+
+<size> is the size of the storage file in the format 16G. Supported are 'G' for GB and 'M' for MB.
+<type> can be either 'plain' for simple ext4 or 'vault' for LUKS-encrypted ext4.
+<file> the path where the file should be created
+[name] optional, name of the ext4 filesystem
+";
+		elif [[ "$2" == "rename" ]];then
+echo "Usage: $0 rename <file> <name>
+Renames the ext4 filesystem on <file>
+
+<file> file to rename
+<name> new name for the ext4 filesystem
+";
+		elif [[ "$2" == "mount" ]];then
+echo"Usage: $0 mount <file> [path]
+Mounts the storage file
+
+<file> file to mount
+[path] optional, mount file at this path; if missing creates a random path at /media/STOR_AUTOMOUNT_*
+";
+		elif [[ "$2" == "clean" ]];then
+echo "Usage: $0 clean
+Cleans unused directories created by this script
+";
+		else
+			echo "Unrecognized options. See $0 --help for help."; exit 1;
+		fi
+	else
+		echo "Unrecognized options. See $0 --help for help."; exit 1;
+	fi
+	exit 0;
+fi
+
+echo "Unrecognized options. See $0 --help for help"; exit 1;
