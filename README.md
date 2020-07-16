@@ -31,3 +31,8 @@ To rename the ext4 filesystem on a stor file, you can use `stor rename [file]`.
  - Storage file size is limited by the maximum file size of the underlying filesystem
  - This script needs write access to /var/run - run as root or adjust dir permissions accordingly
  - This script is intended for linux distros only
+
+
+### License
+
+[The Unlicense](https://unlicense.org)
